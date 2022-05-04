@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU64;
 
@@ -51,6 +53,38 @@ impl Word {
         Some(Word::u64(w))
     }
 
+    fn rotate(&self) -> [Option<Self>; 2] {
+        let w = self.0.get();
+        let mask = 31;
+        let is_len = |v: u8| w & (mask << v * 5) == 0;
+        if is_len(1) {
+            return [None, None];
+        }
+
+        // TODO: special case 2?
+
+        for len in [2, 3, 4, 5, 6] {
+            if !is_len(len) {
+                continue;
+            }
+
+            let last = (len - 1) * 5;
+
+            let start = w & mask;
+            let end = (w & (mask << last)) >> last;
+
+            let right = w >> 5;
+            let left = (w << 5) & !(mask << len * 5);
+
+            return [
+                Some(Word::u64(right | (start << last))),
+                Some(Word::u64(left | end)),
+            ];
+        }
+
+        unreachable!()
+    }
+
     fn shifts(&self) -> [Option<Self>; 12] {
         let us = self.0.get();
         let mut ret: [Option<Self>; 12] = Default::default();
@@ -80,7 +114,44 @@ impl Word {
 }
 
 fn main() {
-    println!("{:?}", Word::new("hello"));
+    let mut m = HashMap::with_capacity(100_000);
+    let starter = Word::new("sick");
+    m.insert(starter, 0);
+
+    let mut new_words: Vec<Word> = Vec::with_capacity(100);
+    new_words.push(starter);
+    for it in 1..32u8 {
+        let old_words = new_words.clone();
+        new_words.clear();
+        for k in old_words {
+            let mut appl = |op: Option<Word>| {
+                if let Some(word) = op {
+                    if let Entry::Vacant(v) = m.entry(word) {
+                        v.insert(it);
+                        new_words.push(word);
+                    }
+                }
+            };
+            appl(k.dupl_first());
+            appl(k.pop());
+            for op in k.shifts() {
+                appl(op);
+            }
+            for op in k.rotate() {
+                appl(op);
+            }
+        }
+
+        // println!("{:?} {:?}", new_words, m);
+
+        println!(
+            "{}: {} {} true: {:?}",
+            it,
+            new_words.len(),
+            m.len(),
+            m.get(&Word::new("true"))
+        );
+    }
 }
 
 #[test]
@@ -183,5 +254,22 @@ fn shifty_long() {
             Some(Word::new("ooooon")),
         ],
         Word::new("oooooo").shifts()
+    );
+}
+
+#[test]
+fn rotter() {
+    assert_eq!([None, None], Word::new("a").rotate());
+    assert_eq!(
+        [Some(Word::new("aa")), Some(Word::new("aa"))],
+        Word::new("aa").rotate()
+    );
+    assert_eq!(
+        [Some(Word::new("ba")), Some(Word::new("ba"))],
+        Word::new("ab").rotate()
+    );
+    assert_eq!(
+        [Some(Word::new("bca")), Some(Word::new("cab"))],
+        Word::new("abc").rotate()
     );
 }
