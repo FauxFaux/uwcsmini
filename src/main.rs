@@ -1,11 +1,12 @@
 use std::fmt;
+use std::num::NonZeroU64;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct Word(u64);
+struct Word(NonZeroU64);
 
 impl fmt::Debug for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut w = self.0;
+        let mut w = self.0.get();
         while w != 0 {
             let masked = (w & 31) as u8;
             write!(f, "{}", (masked + b'a' - 1) as char)?;
@@ -17,46 +18,50 @@ impl fmt::Debug for Word {
 
 impl Word {
     fn new(from: &str) -> Self {
+        assert!(!from.is_empty());
+        assert!(from.is_ascii());
         let mut w: u64 = 0;
         for (idx, c) in from.chars().enumerate() {
             w |= (((c as u8) - b'a' + 1) as u64) << (idx * 5);
         }
-        Word(w)
+        Word::u64(w)
+    }
+
+    fn u64(val: u64) -> Self {
+        Word(NonZeroU64::new(val).unwrap())
     }
 
     fn dupl_first(&self) -> Option<Self> {
-        let mut w = self.0;
-        if w == 0 {
-            return None;
-        }
+        let mut w = self.0.get();
         if w & 0b00_11111_00000_00000_00000_00000_00000 != 0 {
             return None;
         }
         let s = w & 31;
         w <<= 5;
         w |= s;
-        Some(Word(w))
+        Some(Word::u64(w))
     }
 
     fn pop(&self) -> Option<Self> {
-        let mut w = self.0;
+        let mut w = self.0.get();
         w >>= 5;
         if w == 0 {
             return None;
         }
-        Some(Word(w))
+        Some(Word::u64(w))
     }
 
     fn shifts(&self) -> [Option<Self>; 12] {
+        let us = self.0.get();
         let mut ret: [Option<Self>; 12] = Default::default();
         for i in 0..6 {
             let shift = i * 5;
             let mask = 31 << shift;
-            let c = ((self.0 & mask) >> shift) as u8;
+            let c = ((us & mask) >> shift) as u8;
             if c == 0 {
                 break;
             }
-            let w = self.0 & !mask;
+            let w = us & !mask;
             let mut up = c + 1;
             let mut down = c - 1;
             if up == 27 {
@@ -67,8 +72,8 @@ impl Word {
                 down = 26;
             }
 
-            ret[i] = Some(Word(w | u64::from(up) << shift));
-            ret[i + 6] = Some(Word(w | u64::from(down) << shift));
+            ret[i] = Some(Word::u64(w | u64::from(up) << shift));
+            ret[i + 6] = Some(Word::u64(w | u64::from(down) << shift));
         }
         ret
     }
@@ -99,7 +104,6 @@ fn poppity() {
     assert_eq!(Some(Word::new("bcde")), Word::new("abcde").pop());
     assert_eq!(Some(Word::new("b")), Word::new("ab").pop());
     assert_eq!(None, Word::new("a").pop());
-    assert_eq!(None, Word::new("").pop());
 }
 
 #[test]
