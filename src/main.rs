@@ -114,9 +114,10 @@ impl Word {
 }
 
 fn main() {
-    let mut m = HashMap::with_capacity(100_000);
-    let starter = Word::new("sick");
-    m.insert(starter, 0);
+    let mut m = HashMap::with_capacity(10_000_000);
+    let starter = Word::new("akan");
+    let target = Word::new("calls");
+    m.insert(starter, (0, starter));
 
     let mut new_words: Vec<Word> = Vec::with_capacity(100);
     new_words.push(starter);
@@ -127,7 +128,7 @@ fn main() {
             let mut appl = |op: Option<Word>| {
                 if let Some(word) = op {
                     if let Entry::Vacant(v) = m.entry(word) {
-                        v.insert(it);
+                        v.insert((it, k));
                         new_words.push(word);
                     }
                 }
@@ -144,13 +145,20 @@ fn main() {
 
         // println!("{:?} {:?}", new_words, m);
 
-        println!(
-            "{}: {} {} true: {:?}",
-            it,
-            new_words.len(),
-            m.len(),
-            m.get(&Word::new("true"))
-        );
+        if m.contains_key(&target) {
+            break;
+        }
+
+        println!("{}: {} {}", it, new_words.len(), m.len(),);
+    }
+
+    let mut curr = target;
+    while let Some((it, word)) = m.get(&curr) {
+        println!("{}: {:?}", it, word);
+        if *word == starter {
+            break;
+        }
+        curr = *word;
     }
 }
 
