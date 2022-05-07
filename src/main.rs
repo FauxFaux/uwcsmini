@@ -122,11 +122,20 @@ impl Word {
 
 fn main() {
     let mut lines = include_str!("../input.txt").split('\n');
-    let _count: usize = lines.next().unwrap().parse().unwrap();
+    let mut inputs = Vec::new();
     for line in lines {
+        if line.is_empty() {
+            break;
+        }
         let mut line = line.split(' ');
         let left = line.next().unwrap();
         let right = line.next().unwrap();
+        inputs.push((left, right));
+    }
+
+    inputs.sort_by_key(|(left, right)| left.len().max(right.len()));
+
+    for (left, right) in inputs {
         print_path(&left.to_ascii_lowercase(), &right.to_ascii_lowercase());
     }
 }
