@@ -1,7 +1,9 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt;
+use std::io::Write;
 use std::num::NonZeroU64;
+use std::time::Instant;
+use std::{fmt, fs};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct Word(NonZeroU64);
@@ -22,14 +24,20 @@ impl Word {
     fn new(from: &str) -> Self {
         assert!(!from.is_empty());
         assert!(from.is_ascii());
+        if from.len() > (u64::BITS / 5) as usize {
+            panic!("TOO LONG: {:?}", from);
+        }
         let mut w: u64 = 0;
         for (idx, c) in from.chars().enumerate() {
+            if c < 'a' || c > 'z' {
+                panic!("invalid character: {:?}", c);
+            }
             w |= (((c as u8) - b'a' + 1) as u64) << (idx * 5);
         }
-        Word::u64(w)
+        Word::raw(w)
     }
 
-    fn u64(val: u64) -> Self {
+    fn raw(val: u64) -> Self {
         Word(NonZeroU64::new(val).unwrap())
     }
 
@@ -47,7 +55,7 @@ impl Word {
         let s = w & 31;
         w <<= 5;
         w |= s;
-        Some(Word::u64(w))
+        Some(Word::raw(w))
     }
 
     fn pop(&self) -> Option<Self> {
@@ -56,7 +64,7 @@ impl Word {
         if w == 0 {
             return None;
         }
-        Some(Word::u64(w))
+        Some(Word::raw(w))
     }
 
     fn rotate(&self) -> [Option<Self>; 2] {
@@ -79,8 +87,8 @@ impl Word {
         let left = (w << 5) & !(mask << len * 5);
 
         return [
-            Some(Word::u64(right | (start << last))),
-            Some(Word::u64(left | end)),
+            Some(Word::raw(right | (start << last))),
+            Some(Word::raw(left | end)),
         ];
     }
 
@@ -105,19 +113,32 @@ impl Word {
                 down = 26;
             }
 
-            ret[i] = Some(Word::u64(w | u64::from(up) << shift));
-            ret[i + 6] = Some(Word::u64(w | u64::from(down) << shift));
+            ret[i] = Some(Word::raw(w | u64::from(up) << shift));
+            ret[i + 6] = Some(Word::raw(w | u64::from(down) << shift));
         }
         ret
     }
 }
 
 fn main() {
+    let mut lines = include_str!("../input.txt").split('\n');
+    let _count: usize = lines.next().unwrap().parse().unwrap();
+    for line in lines {
+        let mut line = line.split(' ');
+        let left = line.next().unwrap();
+        let right = line.next().unwrap();
+        print_path(&left.to_ascii_lowercase(), &right.to_ascii_lowercase());
+    }
+}
+
+fn print_path(left: &str, right: &str) {
+    let start = Instant::now();
     let mut m = HashMap::with_capacity(10_000_000);
-    let starter = Word::new("sick");
-    let target = Word::new("true");
+    println!("trying {} -> {}", left, right);
+    let starter = Word::new(left);
+    let target = Word::new(right);
     m.insert(starter, (0, starter));
-    let len_limit = 6;
+    let len_limit = (left.len().max(right.len())) as u8;
 
     let mut new_words: Vec<Word> = Vec::with_capacity(100);
     new_words.push(starter);
@@ -152,14 +173,36 @@ fn main() {
         println!("{}: {} {}", it, new_words.len(), m.len(),);
     }
 
+    let mut path = Vec::with_capacity(32);
     let mut curr = target;
+    path.push(curr);
     while let Some((it, word)) = m.get(&curr) {
-        println!("{}: {:?}", it, word);
+        path.push(*word);
         if *word == starter {
             break;
         }
         curr = *word;
     }
+
+    path.reverse();
+    log(&format!(
+        "{} {:?} {:?}",
+        path.len(),
+        path,
+        Instant::now() - start,
+    ));
+}
+
+fn log(line: &str) {
+    println!("{}", line);
+    let mut file = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("log.log")
+        .unwrap();
+    file.write_all(line.as_bytes()).unwrap();
+    file.write_all(b"\n").unwrap();
+    file.flush().unwrap();
 }
 
 #[test]

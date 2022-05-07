@@ -1,2 +1,8 @@
 /target
 .idea/
+input.txt
+log.log
+*.svg
+*.old
+*.fxt
+perf.data
