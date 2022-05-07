@@ -137,7 +137,7 @@ fn print_path(left: &str, right: &str) {
     println!("trying {} -> {}", left, right);
     let starter = Word::new(left);
     let target = Word::new(right);
-    m.insert(starter, (0, starter));
+    m.insert(starter, starter);
     let len_limit = (left.len().max(right.len())) as u8;
 
     let mut new_words: Vec<Word> = Vec::with_capacity(100);
@@ -149,7 +149,7 @@ fn print_path(left: &str, right: &str) {
             let mut appl = |op: Option<Word>| {
                 if let Some(word) = op {
                     if let Entry::Vacant(v) = m.entry(word) {
-                        v.insert((it, k));
+                        v.insert(k);
                         new_words.push(word);
                     }
                 }
@@ -176,7 +176,7 @@ fn print_path(left: &str, right: &str) {
     let mut path = Vec::with_capacity(32);
     let mut curr = target;
     path.push(curr);
-    while let Some((it, word)) = m.get(&curr) {
+    while let Some(word) = m.get(&curr) {
         path.push(*word);
         if *word == starter {
             break;
