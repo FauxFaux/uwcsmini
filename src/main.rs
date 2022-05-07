@@ -33,11 +33,17 @@ impl Word {
         Word(NonZeroU64::new(val).unwrap())
     }
 
-    fn dupl_first(&self) -> Option<Self> {
-        let mut w = self.0.get();
-        if w & 0b00_11111_00000_00000_00000_00000_00000 != 0 {
+    fn len(&self) -> u8 {
+        let w = self.0.get();
+        let first_bit_set = u64::BITS - w.leading_zeros() + (5 - 1);
+        (first_bit_set / 5) as u8
+    }
+
+    fn dupl_first(&self, len_limit: u8) -> Option<Self> {
+        if self.len() >= len_limit {
             return None;
         }
+        let mut w = self.0.get();
         let s = w & 31;
         w <<= 5;
         w |= s;
@@ -54,35 +60,28 @@ impl Word {
     }
 
     fn rotate(&self) -> [Option<Self>; 2] {
-        let w = self.0.get();
         let mask = 31;
-        let is_len = |v: u8| w & (mask << v * 5) == 0;
-        if is_len(1) {
+
+        let len = self.len();
+
+        if 1 == len {
             return [None, None];
         }
 
-        // TODO: special case 2?
+        let w = self.0.get();
 
-        for len in [2, 3, 4, 5, 6] {
-            if !is_len(len) {
-                continue;
-            }
+        let last = (len - 1) * 5;
 
-            let last = (len - 1) * 5;
+        let start = w & mask;
+        let end = (w & (mask << last)) >> last;
 
-            let start = w & mask;
-            let end = (w & (mask << last)) >> last;
+        let right = w >> 5;
+        let left = (w << 5) & !(mask << len * 5);
 
-            let right = w >> 5;
-            let left = (w << 5) & !(mask << len * 5);
-
-            return [
-                Some(Word::u64(right | (start << last))),
-                Some(Word::u64(left | end)),
-            ];
-        }
-
-        unreachable!()
+        return [
+            Some(Word::u64(right | (start << last))),
+            Some(Word::u64(left | end)),
+        ];
     }
 
     fn shifts(&self) -> [Option<Self>; 12] {
@@ -115,9 +114,10 @@ impl Word {
 
 fn main() {
     let mut m = HashMap::with_capacity(10_000_000);
-    let starter = Word::new("akan");
-    let target = Word::new("calls");
+    let starter = Word::new("sick");
+    let target = Word::new("true");
     m.insert(starter, (0, starter));
+    let len_limit = 6;
 
     let mut new_words: Vec<Word> = Vec::with_capacity(100);
     new_words.push(starter);
@@ -133,7 +133,7 @@ fn main() {
                     }
                 }
             };
-            appl(k.dupl_first());
+            appl(k.dupl_first(len_limit));
             appl(k.pop());
             for op in k.shifts() {
                 appl(op);
@@ -163,6 +163,16 @@ fn main() {
 }
 
 #[test]
+fn lens() {
+    assert_eq!(1, Word::new("a").len());
+    assert_eq!(1, Word::new("z").len());
+    assert_eq!(2, Word::new("aa").len());
+    assert_eq!(2, Word::new("zz").len());
+    assert_eq!(7, Word::new("aaaaaaa").len());
+    assert_eq!(7, Word::new("zzzzzzz").len());
+}
+
+#[test]
 fn strs() {
     assert_eq!("a", format!("{:?}", Word::new("a")));
     assert_eq!("ab", format!("{:?}", Word::new("ab")));
@@ -172,10 +182,16 @@ fn strs() {
 
 #[test]
 fn dupl() {
-    assert_eq!(Some(Word::new("aa")), Word::new("a").dupl_first());
-    assert_eq!(Some(Word::new("aab")), Word::new("ab").dupl_first());
-    assert_eq!(Some(Word::new("aabcde")), Word::new("abcde").dupl_first());
-    assert_eq!(None, Word::new("abcdef").dupl_first());
+    assert_eq!(Some(Word::new("aa")), Word::new("a").dupl_first(8));
+    assert_eq!(Some(Word::new("aab")), Word::new("ab").dupl_first(8));
+    assert_eq!(Some(Word::new("aabcde")), Word::new("abcde").dupl_first(8));
+    assert_eq!(None, Word::new("abcdefgh").dupl_first(8));
+}
+
+#[test]
+fn dupl_limit() {
+    assert_eq!(None, Word::new("a").dupl_first(1));
+    assert_eq!(None, Word::new("ab").dupl_first(2));
 }
 
 #[test]
